@@ -46,6 +46,8 @@ jobs:
         contains(github.event.comment.body, '/bench') &&
         contains(fromJson('["COLLABORATOR","MEMBER","OWNER"]'), github.event.comment.author_association)
       )
+    outputs:
+      pr_number: ${{ steps.inputs.outputs.pr_number }}
 
     steps:
       - name: Resolve inputs
@@ -115,8 +117,19 @@ jobs:
           path: bench/results/
           if-no-files-found: ignore
 
+  comment:
+    name: Post PR comment
+    runs-on: ubuntu-latest
+    needs: bench
+    if: needs.bench.outputs.pr_number != ''
+    steps:
+      - name: Download results
+        uses: actions/download-artifact@v4
+        with:
+          name: bench-results
+          path: bench/results/
+
       - name: Post PR comment
-        if: steps.inputs.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.event_name == 'repository_dispatch' && secrets.CLIENT_COMMENT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -162,7 +175,7 @@ jobs:
               body += 'No results found.\n';
             }
 
-            const prNumber = parseInt('${{ steps.inputs.outputs.pr_number }}');
+            const prNumber = parseInt('${{ needs.bench.outputs.pr_number }}');
 
             // For cross-repo dispatches, the pr_repo payload field identifies
             // the main repo where the PR lives (not the fork used for checkout).
